@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Send, Bot, User, Settings, Trash2, Upload, FileText, Search } from 'lucide-react'
+import { Send, Bot, User, Settings, Trash2, Upload, FileText, Search, Sparkles, Brain, Headphones } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import toast, { Toaster } from 'react-hot-toast'
 import { chatAPI } from '../utils/api'
 import DocumentUpload from './DocumentUpload'
 
@@ -16,11 +18,16 @@ const ChatInterface = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState(null)
   const [currentMode, setCurrentMode] = useState('assistant')
-  const [availableModes, setAvailableModes] = useState([])
+  const [availableModes, setAvailableModes] = useState([
+    { id: 'assistant', name: 'Assistant', description: 'General AI assistant', icon: Sparkles },
+    { id: 'developer', name: 'Developer', description: 'Coding & technical help', icon: Brain },
+    { id: 'support', name: 'Support', description: 'Customer service agent', icon: Headphones }
+  ])
   const [showSettings, setShowSettings] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [useRAG, setUseRAG] = useState(false)
   const [error, setError] = useState(null)
+  const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef(null)
 
   // Load available modes on component mount
@@ -28,9 +35,15 @@ const ChatInterface = () => {
     const loadModes = async () => {
       try {
         const modesData = await chatAPI.getModes()
-        setAvailableModes(modesData.modes)
+        // Merge with default modes to get icons
+        const mergedModes = modesData.modes.map(mode => {
+          const defaultMode = availableModes.find(m => m.id === mode.id)
+          return { ...mode, icon: defaultMode?.icon || Sparkles }
+        })
+        setAvailableModes(mergedModes)
       } catch (error) {
         console.error('Failed to load chat modes:', error)
+        toast.error('Failed to load chat modes')
       }
     }
     loadModes()
@@ -56,6 +69,7 @@ const ChatInterface = () => {
     const messageText = inputText
     setInputText('')
     setIsLoading(true)
+    setIsTyping(true)
     setError(null)
 
     try {
@@ -69,6 +83,7 @@ const ChatInterface = () => {
       // Update session ID if this is the first message
       if (!sessionId) {
         setSessionId(response.session_id)
+        toast.success('New conversation started!')
       }
 
       const botMessage = {
@@ -81,9 +96,13 @@ const ChatInterface = () => {
       }
 
       setMessages(prev => [...prev, botMessage])
+
+      if (useRAG) {
+        toast.success('Response generated using your documents!')
+      }
     } catch (error) {
       console.error('Chat error:', error)
-      setError('Failed to send message. Please try again.')
+      toast.error('Failed to send message. Please try again.')
 
       const errorMessage = {
         id: Date.now() + 1,
@@ -95,6 +114,7 @@ const ChatInterface = () => {
       setMessages(prev => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
+      setIsTyping(false)
     }
   }
 
@@ -129,9 +149,11 @@ const ChatInterface = () => {
     setShowSettings(false)
 
     const modeInfo = availableModes.find(mode => mode.id === newMode)
+    toast.success(`Switched to ${modeInfo?.name || newMode} mode`)
+
     const modeMessage = {
       id: Date.now(),
-      text: `Switched to ${modeInfo?.name || newMode} mode. ${modeInfo?.description || ''}`,
+      text: `🔄 Switched to ${modeInfo?.name || newMode} mode. ${modeInfo?.description || ''}`,
       sender: 'bot',
       timestamp: new Date(),
       isSystemMessage: true
@@ -140,6 +162,8 @@ const ChatInterface = () => {
   }
 
   const handleUploadSuccess = (result) => {
+    toast.success(`Document "${result.filename}" uploaded successfully!`)
+
     const uploadMessage = {
       id: Date.now(),
       text: `📄 Document "${result.filename}" uploaded successfully! ${result.processing_info?.chunks_created || 0} chunks created. You can now ask questions about this document.`,
@@ -149,173 +173,227 @@ const ChatInterface = () => {
     }
     setMessages(prev => [...prev, uploadMessage])
     setShowUpload(false)
+
+    // Auto-enable RAG when document is uploaded
+    if (!useRAG) {
+      setUseRAG(true)
+      toast.info('Document search enabled automatically!')
+    }
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] bg-white rounded-lg shadow-lg">
-      {/* Header with controls */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <div className="flex items-center space-x-3">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {availableModes.find(mode => mode.id === currentMode)?.name || 'Chat'}
-          </h2>
-          {sessionId && (
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              Session: {sessionId.slice(0, 8)}...
-            </span>
+    <div className="flex flex-col h-[calc(100vh-200px)]">
+      <Toaster position="top-right" />
+
+      {/* Enhanced Header */}
+      <motion.div
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-t-lg shadow-lg"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <motion.div
+              animate={{ rotate: isTyping ? 360 : 0 }}
+              transition={{ duration: 2, repeat: isTyping ? Infinity : 0 }}
+            >
+              <Bot size={24} className="text-white" />
+            </motion.div>
+            <div>
+              <h2 className="text-lg font-semibold">
+                Conversational AI
+              </h2>
+              <p className="text-sm text-blue-100">
+                Powered by Google Gemini
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setUseRAG(!useRAG)}
+              className={`p-2 rounded-lg transition-colors ${
+                useRAG
+                  ? 'bg-white/20 text-white'
+                  : 'bg-white/10 text-white/70 hover:bg-white/20'
+              }`}
+              title={useRAG ? "Document search enabled" : "Enable document search"}
+            >
+              <Search size={18} />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowUpload(true)}
+              className="p-2 bg-white/10 text-white/70 hover:bg-white/20 rounded-lg transition-colors"
+              title="Upload documents"
+            >
+              <Upload size={18} />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleClearConversation}
+              className="p-2 bg-white/10 text-white/70 hover:bg-red-400/20 rounded-lg transition-colors"
+              title="Clear conversation"
+            >
+              <Trash2 size={18} />
+            </motion.button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Mode Selector - Always Visible */}
+      <motion.div
+        initial={{ y: -10, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="bg-white border-b border-gray-200 p-3"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-gray-700">Mode:</span>
+            <div className="flex space-x-1">
+              {availableModes.map((mode) => {
+                const IconComponent = mode.icon
+                return (
+                  <motion.button
+                    key={mode.id}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleModeChange(mode.id)}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      currentMode === mode.id
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    title={mode.description}
+                  >
+                    <IconComponent size={16} />
+                    <span>{mode.name}</span>
+                  </motion.button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* RAG Status */}
+          {useRAG && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="flex items-center space-x-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs"
+            >
+              <FileText size={14} />
+              <span>Document Search Active</span>
+            </motion.div>
           )}
         </div>
-
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setUseRAG(!useRAG)}
-            className={`p-2 rounded-lg transition-colors ${
-              useRAG
-                ? 'text-primary-600 bg-primary-100 hover:bg-primary-200'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-            }`}
-            title={useRAG ? "RAG enabled - AI will search documents" : "RAG disabled - Normal chat"}
-          >
-            <Search size={18} />
-          </button>
-          <button
-            onClick={() => setShowUpload(true)}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Upload documents"
-          >
-            <Upload size={18} />
-          </button>
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Settings"
-          >
-            <Settings size={18} />
-          </button>
-          <button
-            onClick={handleClearConversation}
-            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            title="Clear conversation"
-          >
-            <Trash2 size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* RAG Status Indicator */}
-      {useRAG && (
-        <div className="px-4 py-2 bg-blue-50 border-b border-blue-200">
-          <div className="flex items-center space-x-2">
-            <FileText size={16} className="text-blue-600" />
-            <span className="text-sm text-blue-700 font-medium">
-              Document Search Enabled
-            </span>
-            <span className="text-xs text-blue-600">
-              AI will search uploaded documents to answer your questions
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Settings Panel */}
-      {showSettings && (
-        <div className="p-4 bg-gray-50 border-b border-gray-200">
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <span className="text-sm font-medium text-gray-700 mr-2">Mode:</span>
-              {availableModes.map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => handleModeChange(mode.id)}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                    currentMode === mode.id
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  {mode.name}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Document Search (RAG)</span>
-              <button
-                onClick={() => setUseRAG(!useRAG)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  useRAG ? 'bg-primary-500' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    useRAG ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error Banner */}
-      {error && (
-        <div className="p-3 bg-red-50 border-b border-red-200 text-red-700 text-sm">
-          {error}
-          <button
-            onClick={() => setError(null)}
-            className="ml-2 text-red-500 hover:text-red-700"
-          >
-            ×
-          </button>
-        </div>
-      )}
+      </motion.div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-container">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex items-start space-x-3 ${
-              message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''
-            } ${message.isSystemMessage ? 'justify-center' : ''}`}
-          >
-            {!message.isSystemMessage && (
-              <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                message.sender === 'user'
-                  ? 'bg-primary-500 text-white'
-                  : message.isError
-                  ? 'bg-red-200 text-red-600'
-                  : 'bg-gray-200 text-gray-600'
-              }`}>
-                {message.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
-              </div>
-            )}
-
-            <div className={`${
-              message.isSystemMessage
-                ? 'bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs'
-                : `chat-bubble ${
-                    message.sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-bot'
-                  } ${message.isError ? 'border-red-200 bg-red-50' : ''}`
-            }`}>
-              <p className={message.isSystemMessage ? '' : 'text-sm'}>{message.text}</p>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-container bg-gradient-to-b from-gray-50 to-white">
+        <AnimatePresence>
+          {messages.map((message, index) => (
+            <motion.div
+              key={message.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
+              className={`flex items-start space-x-3 ${
+                message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''
+              } ${message.isSystemMessage ? 'justify-center' : ''}`}
+            >
               {!message.isSystemMessage && (
-                <div className="flex items-center justify-between mt-1">
-                  <p className={`text-xs ${
-                    message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
-                  }`}>
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
-                  {message.tokensUsed && (
-                    <span className="text-xs text-gray-400 ml-2">
-                      {message.tokensUsed} tokens
-                    </span>
-                  )}
-                </div>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-md ${
+                    message.sender === 'user'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
+                      : message.isError
+                      ? 'bg-red-200 text-red-600'
+                      : 'bg-gradient-to-r from-gray-200 to-gray-300 text-gray-600'
+                  }`}
+                >
+                  {message.sender === 'user' ? <User size={18} /> : <Bot size={18} />}
+                </motion.div>
               )}
-            </div>
-          </div>
-        ))}
+
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className={`${
+                  message.isSystemMessage
+                    ? 'bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 px-4 py-2 rounded-full text-sm shadow-sm'
+                    : `max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-md ${
+                        message.sender === 'user'
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white ml-auto'
+                          : message.isError
+                          ? 'border-red-200 bg-red-50 text-red-700 mr-auto'
+                          : 'bg-white text-gray-900 mr-auto border border-gray-200'
+                      }`
+                }`}
+              >
+                <p className={message.isSystemMessage ? '' : 'text-sm leading-relaxed'}>{message.text}</p>
+                {!message.isSystemMessage && (
+                  <div className="flex items-center justify-between mt-2">
+                    <p className={`text-xs ${
+                      message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
+                    }`}>
+                      {message.timestamp.toLocaleTimeString()}
+                    </p>
+                    {message.tokensUsed && (
+                      <span className="text-xs text-gray-400 ml-2">
+                        {message.tokensUsed} tokens
+                      </span>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {/* Typing Indicator */}
+        <AnimatePresence>
+          {isTyping && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="flex items-start space-x-3"
+            >
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-r from-gray-200 to-gray-300 text-gray-600 flex items-center justify-center shadow-md">
+                <Bot size={18} />
+              </div>
+              <div className="bg-white text-gray-900 px-4 py-3 rounded-2xl shadow-md border border-gray-200">
+                <div className="flex space-x-1">
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0 }}
+                    className="w-2 h-2 bg-gray-400 rounded-full"
+                  />
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+                    className="w-2 h-2 bg-gray-400 rounded-full"
+                  />
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+                    className="w-2 h-2 bg-gray-400 rounded-full"
+                  />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div ref={messagesEndRef} />
         
         {isLoading && (
@@ -334,27 +412,49 @@ const ChatInterface = () => {
         )}
       </div>
 
-      {/* Input Form */}
-      <div className="border-t border-gray-200 p-4">
+      {/* Enhanced Input Form */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="border-t border-gray-200 bg-white p-4"
+      >
         <form onSubmit={handleSendMessage} className="flex space-x-3">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            disabled={isLoading}
-          />
-          <button
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder={useRAG ? "Ask about your documents..." : "Type your message..."}
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+              disabled={isLoading}
+            />
+            {useRAG && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <FileText size={16} className="text-green-500" />
+              </div>
+            )}
+          </div>
+          <motion.button
             type="submit"
             disabled={!inputText.trim() || isLoading}
-            className="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:to-purple-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 shadow-lg transition-all duration-200"
           >
-            <Send size={16} />
-            <span>Send</span>
-          </button>
+            {isLoading ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              >
+                <Bot size={18} />
+              </motion.div>
+            ) : (
+              <Send size={18} />
+            )}
+            <span>{isLoading ? 'Sending...' : 'Send'}</span>
+          </motion.button>
         </form>
-      </div>
+      </motion.div>
 
       {/* Document Upload Modal */}
       {showUpload && (

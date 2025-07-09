@@ -53,7 +53,7 @@ conversational-ai/
 
 ### Prerequisites
 - Docker and Docker Compose
-- OpenAI API key (optional for testing)
+- Google Gemini API key (free tier available, optional for testing)
 
 ### One-Command Deployment
 
@@ -101,15 +101,21 @@ npm run dev
 
 Create `server/.env` with your configuration:
 ```env
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-3.5-turbo
+GOOGLE_API_KEY=your_google_api_key_here
+GEMINI_MODEL=gemini-pro
 VECTOR_DB_TYPE=faiss
 ALLOWED_ORIGINS=http://localhost:3000
 ```
 
-### Testing Without OpenAI API
+### Getting Google Gemini API Key
 
-The application works in test mode without an OpenAI API key, using mock responses for development and testing.
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create a new API key
+3. Copy the key to your `.env` file
+
+### Testing Without Gemini API
+
+The application works in test mode without a Gemini API key, using mock responses for development and testing.
 
 ## API Endpoints
 
@@ -187,8 +193,8 @@ python test_e2e.py
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                               │
                        ┌─────────────────┐
-                       │   OpenAI API    │
-                       │   (Optional)    │
+                       │  Google Gemini  │
+                       │     (Free)      │
                        └─────────────────┘
 ```
 

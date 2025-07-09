@@ -50,7 +50,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "gemini_configured": bool(os.getenv("GOOGLE_API_KEY")),
         "vector_db_type": os.getenv("VECTOR_DB_TYPE", "faiss")
     }
 

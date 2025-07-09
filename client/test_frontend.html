@@ -91,7 +91,7 @@
                 
                 if (response.ok && data.status === 'healthy') {
                     addResult('✅ Health check passed', 'success');
-                    addResult(`OpenAI configured: ${data.openai_configured}, Vector DB: ${data.vector_db_type}`, 'info');
+                    addResult(`Gemini configured: ${data.gemini_configured}, Vector DB: ${data.vector_db_type}`, 'info');
                 } else {
                     addResult('❌ Health check failed', 'error');
                 }

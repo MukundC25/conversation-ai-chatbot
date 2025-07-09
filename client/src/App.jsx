@@ -14,7 +14,7 @@ function App() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-500">
-                Powered by OpenAI
+                Powered by Google Gemini
               </span>
             </div>
           </div>

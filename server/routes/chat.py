@@ -35,20 +35,22 @@ class ChatResponse(BaseModel):
     tokens_used: Optional[int] = None
     memory_stats: Optional[Dict] = None
 
-# OpenAI client setup with fallback for testing
-def get_openai_client():
-    """Get OpenAI client with fallback for testing"""
-    api_key = os.getenv("OPENAI_API_KEY")
+# Gemini client setup with fallback for testing
+def get_gemini_client():
+    """Get Gemini client with fallback for testing"""
+    api_key = os.getenv("GOOGLE_API_KEY")
 
     # Allow testing without API key
-    if not api_key or api_key == "your_openai_api_key_here":
+    if not api_key or api_key == "your_google_api_key_here":
         return None
 
     try:
-        from openai import OpenAI
-        return OpenAI(api_key=api_key)
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-pro"))
+        return model
     except ImportError:
-        raise HTTPException(status_code=500, detail="OpenAI package not installed")
+        raise HTTPException(status_code=500, detail="Google Generative AI package not installed")
 
 def generate_mock_response(message: str, mode: str) -> str:
     """Generate a mock response for testing without OpenAI API"""
@@ -90,8 +92,8 @@ async def chat(request: ChatRequest):
 
         logger.info(f"Processing chat for session {session_id}")
 
-        # Get OpenAI client
-        client = get_openai_client()
+        # Get Gemini client
+        client = get_gemini_client()
 
         if client is None:
             # Use mock response for testing
@@ -121,49 +123,36 @@ async def chat(request: ChatRequest):
                         get_system_prompt(request.mode)
                     )
 
-                    messages = [{"role": "user", "content": rag_prompt}]
+                    prompt_text = rag_prompt
                     logger.info(f"Using RAG for session {session_id} with {len(sources)} source documents")
                 else:
                     # No relevant documents found, use regular chat
-                    messages = [
-                        {"role": "system", "content": get_system_prompt(request.mode)},
-                        {"role": "user", "content": request.message}
-                    ]
+                    prompt_text = f"{get_system_prompt(request.mode)}\n\nUser: {request.message}"
                     logger.info(f"No relevant documents found for RAG query in session {session_id}")
             else:
-                # Regular chat without RAG
-                messages = [
-                    {"role": "system", "content": get_system_prompt(request.mode)}
-                ]
+                # Regular chat without RAG - build conversation context
+                conversation_parts = [get_system_prompt(request.mode)]
 
                 # Add conversation history from memory
                 memory_messages = memory.get_messages()
                 for msg in memory_messages[-10:]:  # Keep last 10 messages for context
                     if hasattr(msg, 'content'):
-                        role = "user" if msg.__class__.__name__ == "HumanMessage" else "assistant"
-                        messages.append({
-                            "role": role,
-                            "content": msg.content
-                        })
+                        role = "User" if msg.__class__.__name__ == "HumanMessage" else "Assistant"
+                        conversation_parts.append(f"{role}: {msg.content}")
 
                 # Add current user message
-                messages.append({
-                    "role": "user",
-                    "content": request.message
-                })
+                conversation_parts.append(f"User: {request.message}")
+                conversation_parts.append("Assistant:")
 
-            logger.info(f"Calling OpenAI API for session {session_id} with {len(messages)} messages (RAG: {request.use_rag})")
+                prompt_text = "\n\n".join(conversation_parts)
 
-            # Call OpenAI API
-            response = client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
-                messages=messages,
-                max_tokens=1000,
-                temperature=0.7
-            )
+            logger.info(f"Calling Gemini API for session {session_id} (RAG: {request.use_rag})")
 
-            ai_response = response.choices[0].message.content
-            tokens_used = response.usage.total_tokens if response.usage else None
+            # Call Gemini API
+            response = client.generate_content(prompt_text)
+
+            ai_response = response.text
+            tokens_used = None  # Gemini doesn't provide token usage in the same way
 
         # Save conversation turn to memory
         memory.add_message(request.message, ai_response)

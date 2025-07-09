@@ -40,7 +40,7 @@ def test_backend_health():
         if response.status_code == 200:
             data = response.json()
             print_success("Backend is healthy")
-            print_info(f"OpenAI configured: {data.get('openai_configured', False)}")
+            print_info(f"Gemini configured: {data.get('gemini_configured', False)}")
             print_info(f"Vector DB type: {data.get('vector_db_type', 'unknown')}")
             return True
         else:

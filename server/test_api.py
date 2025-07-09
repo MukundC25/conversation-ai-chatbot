@@ -18,7 +18,7 @@ class TestHealthAPI:
         data = response.json()
         assert "status" in data
         assert data["status"] == "healthy"
-        assert "openai_configured" in data
+        assert "gemini_configured" in data
         assert "vector_db_type" in data
 
 class TestChatAPI:
