@@ -17,16 +17,23 @@ class RAGSystem:
                  similarity_threshold: float = 100.0):  # Very permissive for mock embeddings
         """
         Initialize RAG system
-        
+
         Args:
             vector_store: Vector store manager instance
             max_context_length: Maximum length of context to include
             similarity_threshold: Minimum similarity score for relevant documents
         """
-        self.vector_store = vector_store or get_vector_store()
+        self._vector_store = vector_store  # Store the provided vector store
         self.max_context_length = max_context_length
         self.similarity_threshold = similarity_threshold
         self.document_processor = document_processor
+
+    @property
+    def vector_store(self):
+        """Lazy initialization of vector store"""
+        if self._vector_store is None:
+            self._vector_store = get_vector_store()
+        return self._vector_store
         
         logger.info("Initialized RAG system")
     

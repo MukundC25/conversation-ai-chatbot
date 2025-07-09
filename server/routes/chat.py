@@ -49,8 +49,9 @@ def get_gemini_client():
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-pro"))
         return model
-    except ImportError:
-        raise HTTPException(status_code=500, detail="Google Generative AI package not installed")
+    except (ImportError, Exception) as e:
+        logger.warning(f"Failed to initialize Gemini client: {e}")
+        return None
 
 def generate_mock_response(message: str, mode: str) -> str:
     """Generate a mock response for testing without OpenAI API"""
@@ -171,7 +172,7 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
 
 @router.post("/chat/stream")
-async def chat_stream(request: ChatRequest, client = Depends(get_openai_client)):
+async def chat_stream(request: ChatRequest, client = Depends(get_gemini_client)):
     """
     Streaming chat endpoint for real-time responses
     """
