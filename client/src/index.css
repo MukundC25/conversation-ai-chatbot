@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,49 +7,78 @@
   html {
     font-family: 'Inter', system-ui, sans-serif;
   }
-  
+
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-slate-900 text-slate-100;
+  }
+
+  * {
+    @apply scrollbar-thin scrollbar-track-slate-800 scrollbar-thumb-slate-600;
   }
 }
 
 @layer components {
   .chat-bubble {
-    @apply max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow-sm;
+    @apply max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-lg backdrop-blur-sm;
   }
-  
+
   .chat-bubble-user {
-    @apply bg-primary-500 text-white ml-auto;
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white ml-auto;
   }
-  
+
   .chat-bubble-bot {
-    @apply bg-white text-gray-900 mr-auto border border-gray-200;
+    @apply bg-slate-800/80 text-slate-100 mr-auto border border-slate-700/50;
   }
-  
+
   .typing-indicator {
     @apply flex space-x-1;
   }
-  
+
   .typing-dot {
-    @apply w-2 h-2 bg-gray-400 rounded-full animate-pulse;
+    @apply w-2 h-2 bg-slate-400 rounded-full animate-pulse;
+  }
+
+  .glass-effect {
+    @apply bg-slate-800/50 backdrop-blur-xl border border-slate-700/50;
+  }
+
+  .gradient-border {
+    @apply relative;
+  }
+
+  .gradient-border::before {
+    content: '';
+    @apply absolute inset-0 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 p-[1px];
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar for dark theme */
 .chat-container::-webkit-scrollbar {
   width: 6px;
 }
 
 .chat-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: rgba(30, 41, 59, 0.3);
   border-radius: 3px;
 }
 
 .chat-container::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: rgba(71, 85, 105, 0.8);
   border-radius: 3px;
 }
 
 .chat-container::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: rgba(71, 85, 105, 1);
 }
